@@ -112,6 +112,20 @@ def top_tfidf_terms(tfidf_matrix, feature_names, doc_index, top_n=10):
     top_indices = row.argsort()[-top_n:][::-1]
     return [(feature_names[i], row[i]) for i in top_indices]
 
+def load_and_preprocess_multiple(file_label_pairs):
+    dfs = []
+    for path, label in file_label_pairs:
+        df = pd.read_csv(path, encoding='ISO-8859-1')
+        df['bias'] = label
+        dfs.append(df)
+    df_all = pd.concat(dfs, ignore_index=True)
+
+    df_all['named_entities'] = df_all['content'].apply(extract_named_entities)
+    df_all['tokens'] = df_all['content'].apply(preprocess)
+    df_all['sentiment'] = df_all['content'].apply(analyze_sentiment)
+    return df_all
+
+
 def plot_tfidf_pca(tfidf_matrix, labels):
     if tfidf_matrix.shape[0] < 2:
         print("⚠️ Not enough articles to perform PCA. Add more samples first.")
@@ -137,8 +151,13 @@ def plot_tfidf_pca(tfidf_matrix, labels):
 
 
 def main():
-    csv_path = 'political_articles_left.csv'  # Adjust if needed
-    df = load_and_preprocess(csv_path)
+    # Load multiple labeled datasets
+    file_label_pairs = [
+        ("political_articles_left.csv", "Left"),
+        ("political_articles_right.csv", "Right"),
+        ("political_articles_center.csv", "Neutral")
+    ]
+    df = load_and_preprocess_multiple(file_label_pairs)
 
     print("\n=== Preprocessed Tokens (First 100 characters) ===")
     print(df['tokens'].apply(lambda x: ' '.join(x[:20])))
@@ -153,12 +172,18 @@ def main():
     top_terms = top_tfidf_terms(tfidf_matrix, feature_names, 0)
     for term, score in top_terms:
         print(f"{term}: {score:.4f}")
-    
+
+    # Lexicon-based scoring
     scorer = BiasScorer(LEFT_LEXICON, RIGHT_LEXICON)
     df['bias_scores'] = df['tokens'].apply(scorer.bias_score)
     df['bias_label'] = df['bias_scores'].apply(lambda x: scorer.label_bias(x['bias_score']))
 
-    plot_tfidf_pca(tfidf_matrix, df['bias_label'].tolist())
+    # Plot using ground-truth bias from CSVs
+    plot_tfidf_pca(tfidf_matrix, df['bias'].tolist())
+
+    # Save full output for milestone use
+    df.to_csv("processed_articles_with_features.csv", index=False)
+
 
 
 if __name__ == '__main__':
