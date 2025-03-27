@@ -13,8 +13,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 
-
-
 nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('wordnet')
