@@ -12,6 +12,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
+from sklearn.metrics import classification_report, confusion_matrix
+import seaborn as sns
 
 nltk.download('punkt')
 nltk.download('stopwords')
@@ -115,10 +117,17 @@ def top_tfidf_terms(tfidf_matrix, feature_names, doc_index, top_n=10):
 def load_and_preprocess_multiple(file_label_pairs):
     dfs = []
     for path, label in file_label_pairs:
-        df = pd.read_csv(path, encoding='ISO-8859-1')
+        df = pd.read_csv(path, encoding='utf-8')
+        if "text" in df.columns:
+            df = df.rename(columns={"text": "content"})
         df['bias'] = label
+        df['named_entities'] = df['content'].apply(extract_named_entities)
+        df['tokens'] = df['content'].apply(preprocess)
+        df['sentiment'] = df['content'].apply(analyze_sentiment)
         dfs.append(df)
-    df_all = pd.concat(dfs, ignore_index=True)
+
+    return pd.concat(dfs, ignore_index=True)
+
 
     df_all['named_entities'] = df_all['content'].apply(extract_named_entities)
     df_all['tokens'] = df_all['content'].apply(preprocess)
@@ -153,9 +162,9 @@ def plot_tfidf_pca(tfidf_matrix, labels):
 def main():
     # Load multiple labeled datasets
     file_label_pairs = [
-        ("political_articles_left.csv", "Left"),
-        ("political_articles_right.csv", "Right"),
-        ("political_articles_center.csv", "Neutral")
+    ("allsides_data/political_articles_left.csv", "Left"),
+    ("allsides_data/political_articles_right.csv", "Right"),
+    ("allsides_data/political_articles_center.csv", "Neutral")
     ]
     df = load_and_preprocess_multiple(file_label_pairs)
 
@@ -183,6 +192,19 @@ def main():
 
     # Save full output for milestone use
     df.to_csv("processed_articles_with_features.csv", index=False)
+
+    # Evaluation
+    print("\n=== Evaluation: Lexicon-Based Bias vs Ground Truth ===")
+    print(classification_report(df["bias"], df["bias_label"], digits=3))
+
+    # Confusion matrix heatmap
+    cm = confusion_matrix(df["bias"], df["bias_label"], labels=["Left", "Center", "Right"])
+    sns.heatmap(cm, annot=True, fmt="d", xticklabels=["Left", "Center", "Right"], yticklabels=["Left", "Center", "Right"], cmap="Blues")
+    plt.xlabel("Predicted")
+    plt.ylabel("Actual")
+    plt.title("Confusion Matrix: Lexicon Bias Classifier")
+    plt.tight_layout()
+    plt.show()
 
 
 
