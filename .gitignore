@@ -1,0 +1,18 @@
+# Python + ML
+*.pt
+*.safetensors
+*.h5
+*.ckpt
+*.log
+*.csv
+*.jsonl
+.ipynb_checkpoints/
+__pycache__/
+.DS_Store
+
+# Checkpoint and result folders
+results/
+checkpoints/
+*.cache/
+*.egg-info/
+venv/
