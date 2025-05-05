@@ -150,6 +150,7 @@ def plot_tfidf_pca(tfidf_matrix, labels):
     plt.grid(True)
     plt.tight_layout()
     plt.show()
+    plt.savefig("PCA.png")
 
 
 
