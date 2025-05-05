@@ -1,18 +1,8 @@
-# Python + ML
-*.pt
+# Ignore venv and model folders
+venv*/
+distilbert_bias_model/
 *.safetensors
-*.h5
-*.ckpt
-*.log
-*.csv
-*.jsonl
-.ipynb_checkpoints/
-__pycache__/
-.DS_Store
-
-# Checkpoint and result folders
-results/
-checkpoints/
-*.cache/
-*.egg-info/
-venv/
+*.pt
+*.json
+*.txt
+*.png
