@@ -14,6 +14,7 @@ from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report, confusion_matrix
 import seaborn as sns
+from tqdm import tqdm
 
 nltk.download('punkt')
 nltk.download('stopwords')
@@ -129,12 +130,6 @@ def load_and_preprocess_multiple(file_label_pairs):
     return pd.concat(dfs, ignore_index=True)
 
 
-    df_all['named_entities'] = df_all['content'].apply(extract_named_entities)
-    df_all['tokens'] = df_all['content'].apply(preprocess)
-    df_all['sentiment'] = df_all['content'].apply(analyze_sentiment)
-    return df_all
-
-
 def plot_tfidf_pca(tfidf_matrix, labels):
     if tfidf_matrix.shape[0] < 2:
         print("⚠️ Not enough articles to perform PCA. Add more samples first.")
@@ -162,49 +157,53 @@ def plot_tfidf_pca(tfidf_matrix, labels):
 def main():
     # Load multiple labeled datasets
     file_label_pairs = [
-    ("allsides_data/political_articles_left.csv", "Left"),
-    ("allsides_data/political_articles_right.csv", "Right"),
-    ("allsides_data/political_articles_center.csv", "Neutral")
+        ("allsides_data/political_articles_left.csv", "Left"),
+        ("allsides_data/political_articles_right.csv", "Right"),
+        ("allsides_data/political_articles_center.csv", "Neutral")
     ]
     df = load_and_preprocess_multiple(file_label_pairs)
 
-    print("\n=== Preprocessed Tokens (First 100 characters) ===")
+    print("\n=== Preprocessed Tokens (First 20 tokens) ===")
     print(df['tokens'].apply(lambda x: ' '.join(x[:20])))
 
     print("\n=== Sentiment Scores ===")
     print(df['sentiment'])
 
     tfidf_matrix, feature_names, vectorizer = compute_tfidf_vectors(df)
-
-    # Show top TF-IDF terms for first article
     print("\n=== Top TF-IDF Terms (Article 0) ===")
     top_terms = top_tfidf_terms(tfidf_matrix, feature_names, 0)
     for term, score in top_terms:
         print(f"{term}: {score:.4f}")
 
-    # Lexicon-based scoring
+    # Lexicon-based scoring with tqdm progress bar
+    print("\n=== Scoring Lexicon Bias (This may take a minute) ===")
+    tqdm.pandas(desc="Lexicon Scoring")
     scorer = BiasScorer(LEFT_LEXICON, RIGHT_LEXICON)
-    df['bias_scores'] = df['tokens'].apply(scorer.bias_score)
+    df['bias_scores'] = df['tokens'].progress_apply(scorer.bias_score)
     df['bias_label'] = df['bias_scores'].apply(lambda x: scorer.label_bias(x['bias_score']))
 
-    # Plot using ground-truth bias from CSVs
-    plot_tfidf_pca(tfidf_matrix, df['bias'].tolist())
-
-    # Save full output for milestone use
+    # Save processed CSV
     df.to_csv("processed_articles_with_features.csv", index=False)
+    print("✅ Processed CSV saved.")
+
+    # PCA Visualization
+    print("\n=== Generating PCA Plot ===")
+    plot_tfidf_pca(tfidf_matrix, df['bias'].tolist())
+    print("✅ PCA plot completed.")
 
     # Evaluation
     print("\n=== Evaluation: Lexicon-Based Bias vs Ground Truth ===")
     print(classification_report(df["bias"], df["bias_label"], digits=3))
 
-    # Confusion matrix heatmap
+    print("\n=== Confusion Matrix ===")
     cm = confusion_matrix(df["bias"], df["bias_label"], labels=["Left", "Center", "Right"])
     sns.heatmap(cm, annot=True, fmt="d", xticklabels=["Left", "Center", "Right"], yticklabels=["Left", "Center", "Right"], cmap="Blues")
     plt.xlabel("Predicted")
     plt.ylabel("Actual")
     plt.title("Confusion Matrix: Lexicon Bias Classifier")
     plt.tight_layout()
-    plt.show()
+    plt.savefig("confusion_matrix.png")
+    print("✅ Confusion matrix saved to confusion_matrix.png")
 
 
 
