@@ -12,7 +12,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 # Load and label your data (small subset for fast training)
-def load_dataset(sample_size=3000):
+def load_dataset(sample_size=None):
     file_label_pairs = [
         ("allsides_data/political_articles_left.csv", "Left"),
         ("allsides_data/political_articles_right.csv", "Right"),
@@ -28,7 +28,7 @@ def load_dataset(sample_size=3000):
         dfs.append(df)
 
     df_all = pd.concat(dfs, ignore_index=True)
-    df_all = df_all[['content', 'label']].dropna().sample(n=sample_size, random_state=42)
+    df_all = df_all[['content', 'label']].dropna()
     return df_all
 
 # Compute metrics
@@ -41,7 +41,7 @@ def compute_metrics(pred):
     }
 
 if __name__ == "__main__":
-    df = load_dataset(sample_size=3000)
+    df = load_dataset()
     label_encoder = LabelEncoder()
     df['label'] = label_encoder.fit_transform(df['label'])
 
