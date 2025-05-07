@@ -1,60 +1,93 @@
+import os
 import pandas as pd
-import torch
-from sklearn.model_selection import train_test_split
-from transformers import RobertaTokenizerFast, RobertaForSequenceClassification, Trainer, TrainingArguments
-from datasets import Dataset
-from sklearn.metrics import accuracy_score, f1_score, classification_report
 import numpy as np
-from sklearn.preprocessing import LabelEncoder
+import torch
+from torch.nn import CrossEntropyLoss
 from collections import Counter
-from sklearn.metrics import ConfusionMatrixDisplay
-import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score, f1_score, classification_report
+from transformers import (
+    RobertaTokenizerFast,
+    RobertaConfig,
+    RobertaForSequenceClassification,
+    Trainer,
+    TrainingArguments
+)
+from transformers.modeling_outputs import SequenceClassifierOutput
+from datasets import Dataset
 
-# Check device
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {device}")
+# === Disable wandb if not used ===
+os.environ["WANDB_DISABLED"] = "true"
 
-# Load binary-labeled dataset
+# === Custom weighted loss model ===
+class WeightedRobertaForSequenceClassification(RobertaForSequenceClassification):
+    def __init__(self, config, class_weights=None):
+        super().__init__(config)
+        self.class_weights = class_weights
+
+    def forward(self, input_ids=None, attention_mask=None, labels=None):
+        outputs = self.roberta(input_ids=input_ids, attention_mask=attention_mask)
+        logits = self.classifier(outputs[0])
+
+        loss = None
+        if labels is not None:
+            loss_fct = CrossEntropyLoss(weight=self.class_weights.to(logits.device))
+            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states if hasattr(outputs, "hidden_states") else None,
+            attentions=outputs.attentions if hasattr(outputs, "attentions") else None,
+        )
+
+# === Load and combine local CSVs ===
 def load_binary_dataset():
     file_label_pairs = [
         ("allsides_data/political_articles_left.csv", "Left"),
-        ("allsides_data/political_articles_right.csv", "Right"),
+        ("allsides_data/political_articles_right.csv", "Right")
     ]
-
     dfs = []
     for path, label in file_label_pairs:
-        df = pd.read_csv(path)
-        if "text" in df.columns:
-            df = df.rename(columns={"text": "content"})
-        df['label'] = label
+        try:
+            df = pd.read_csv(path, encoding='utf-8')
+        except UnicodeDecodeError:
+            df = pd.read_csv(path, encoding='mac_roman')  
+        df = df.rename(columns={"text": "content"}) if "text" in df.columns else df
+        df["label"] = label
         dfs.append(df)
+    return pd.concat(dfs, ignore_index=True)[["content", "label"]].dropna()
 
-    df_all = pd.concat(dfs, ignore_index=True)
-    return df_all[['content', 'label']]
 
-# Metric computation
+# === Metric function ===
 def compute_metrics(pred):
     labels = pred.label_ids
     preds = np.argmax(pred.predictions, axis=1)
     return {
         "accuracy": accuracy_score(labels, preds),
-        "f1_macro": f1_score(labels, preds, average='macro')
+        "f1_macro": f1_score(labels, preds, average="macro"),
     }
 
-if __name__ == "__main__":
+def main():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+
     df = load_binary_dataset()
     label_encoder = LabelEncoder()
-    df['label'] = label_encoder.fit_transform(df['label'])  # Left: 0, Right: 1
-
-    # Reduce to 3000 articles for speed (1500 each side)
-    df = df.groupby('label', group_keys=False).apply(lambda x: x.sample(n=750, random_state=42)).reset_index(drop=True)
+    df["label"] = label_encoder.fit_transform(df["label"])
+    print(f"Dataset size: {len(df)}")
+    print("Label counts:", Counter(df["label"]))
 
     train_texts, val_texts, train_labels, val_labels = train_test_split(
-        df['content'].tolist(), df['label'].tolist(), test_size=0.2, random_state=42
+        df["content"].tolist(),
+        df["label"].tolist(),
+        test_size=0.2,
+        stratify=df["label"],
+        random_state=42,
     )
 
     tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
-
     train_encodings = tokenizer(train_texts, truncation=True, padding=True, max_length=512)
     val_encodings = tokenizer(val_texts, truncation=True, padding=True, max_length=512)
 
@@ -69,16 +102,24 @@ if __name__ == "__main__":
         "labels": val_labels
     })
 
-    model = RobertaForSequenceClassification.from_pretrained("roberta-base", num_labels=2).to(device)
+    weights = torch.tensor([1.0, 1.0])  
+    config = RobertaConfig.from_pretrained("roberta-base", num_labels=2)
+    model = WeightedRobertaForSequenceClassification.from_pretrained(
+        "roberta-base", config=config, class_weights=weights
+    ).to(device)
 
     training_args = TrainingArguments(
-        output_dir="./roberta_binary_results",
-        num_train_epochs=3,
+        output_dir="./roberta_binary_results_full",
+        num_train_epochs=4,
         per_device_train_batch_size=8,
         per_device_eval_batch_size=8,
-        logging_dir="./roberta_binary_logs",
-        logging_steps=10,
-        save_strategy="no"
+        learning_rate=2e-5,
+        weight_decay=0.01,
+        warmup_steps=200,
+        logging_dir="./roberta_binary_logs_full",
+        logging_steps=50,
+        save_strategy="no",
+        remove_unused_columns=False,
     )
 
     trainer = Trainer(
@@ -86,23 +127,23 @@ if __name__ == "__main__":
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
-        compute_metrics=compute_metrics
+        tokenizer=tokenizer,
+        compute_metrics=compute_metrics,
     )
 
     trainer.train()
 
-    # Final report
     preds = trainer.predict(val_dataset)
     y_pred = np.argmax(preds.predictions, axis=1)
-    
 
     print("Predicted label distribution:", Counter(y_pred))
     print("True label distribution:", Counter(val_labels))
-
-    print("\n=== RoBERTa Binary Classification Report ===")
+    print("\n=== Full RoBERTa Binary Classification Report ===")
     print(classification_report(val_labels, y_pred, target_names=label_encoder.classes_))
 
-    # Save model and tokenizer
-    model.save_pretrained("./roberta_binary_model")
-    tokenizer.save_pretrained("./roberta_binary_model")
-    print("\n✅ RoBERTa binary classifier saved to ./roberta_binary_model")
+    model.save_pretrained("./roberta_binary_model_full")
+    tokenizer.save_pretrained("./roberta_binary_model_full")
+    print("✅ Model saved to ./roberta_binary_model_full")
+
+if __name__ == "__main__":
+    main()
