@@ -12,7 +12,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 # Load binary-labeled PARTIAL dataset (small for fast training)
-def load_partial_binary_dataset(sample_size_per_class=1500):
+def load_partial_binary_dataset(sample_size_per_class=None):
     file_label_pairs = [
         ("allsides_data/political_articles_left.csv", "Left"),
         ("allsides_data/political_articles_right.csv", "Right"),
@@ -24,7 +24,7 @@ def load_partial_binary_dataset(sample_size_per_class=1500):
         if "text" in df.columns:
             df = df.rename(columns={"text": "content"})
         df['label'] = label
-        df = df.sample(n=min(sample_size_per_class, len(df)), random_state=42)  # limit size
+        # df = df.sample(n=min(sample_size_per_class, len(df)), random_state=42)  # limit size
         dfs.append(df)
 
     df_all = pd.concat(dfs, ignore_index=True)
@@ -40,7 +40,7 @@ def compute_metrics(pred):
     }
 
 if __name__ == "__main__":
-    df = load_partial_binary_dataset(sample_size_per_class=1500)  # ~3K articles total
+    df = load_partial_binary_dataset()  # ~3K articles total
     label_encoder = LabelEncoder()
     df['label'] = label_encoder.fit_transform(df['label'])  # Left: 0, Right: 1
 
