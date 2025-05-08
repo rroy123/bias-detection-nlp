@@ -1,5 +1,3 @@
-# load_allsides.py
-
 import pandas as pd
 import os
 

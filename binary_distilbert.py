@@ -90,7 +90,7 @@ if __name__ == "__main__":
     print("\n=== Binary Classification Report ===")
     print(classification_report(val_labels, y_pred, target_names=label_encoder.classes_))
 
-    # Save model and tokenizer
+    
     model.save_pretrained("./distilbert_binary_model")
     tokenizer.save_pretrained("./distilbert_binary_model")
     print("Binary classifier saved to ./distilbert_binary_model")

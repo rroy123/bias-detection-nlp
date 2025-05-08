@@ -169,23 +169,23 @@ def main():
     for term, score in top_terms:
         print(f"{term}: {score:.4f}")
 
-    # Lexicon-based scoring with tqdm progress bar
+    
     print("\n=== Scoring Lexicon Bias (This may take a minute) ===")
     tqdm.pandas(desc="Lexicon Scoring")
     scorer = BiasScorer(LEFT_LEXICON, RIGHT_LEXICON)
     df['bias_scores'] = df['tokens'].progress_apply(scorer.bias_score)
     df['bias_label'] = df['bias_scores'].apply(lambda x: scorer.label_bias(x['bias_score']))
 
-    # Save processed CSV
+    
     df.to_csv("processed_articles_with_features.csv", index=False)
     print("Processed CSV saved.")
 
-    # PCA Visualization
+    
     print("\n=== Generating PCA Plot ===")
     plot_tfidf_pca(tfidf_matrix, df['bias'].tolist())
     print("PCA plot completed.")
 
-    # Evaluation
+    
     print("\n=== Evaluation: Lexicon-Based Bias vs Ground Truth ===")
     print(classification_report(df["bias"], df["bias_label"], digits=3))
 
