@@ -103,7 +103,7 @@ if __name__ == "__main__":
     print("\n=== Classification Report ===")
     print(classification_report(val_labels, y_pred, target_names=label_encoder.classes_))
 
-    # Save trained model and tokenizer
+    
     model.save_pretrained("./bert_bias_model")
     tokenizer.save_pretrained("./bert_bias_model")
     print("Model and tokenizer saved to ./bert_bias_model")
