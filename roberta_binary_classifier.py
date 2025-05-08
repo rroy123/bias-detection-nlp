@@ -17,10 +17,10 @@ from transformers import (
 from transformers.modeling_outputs import SequenceClassifierOutput
 from datasets import Dataset
 
-# === Disable wandb if not used ===
+
 os.environ["WANDB_DISABLED"] = "true"
 
-# === Custom weighted loss model ===
+
 class WeightedRobertaForSequenceClassification(RobertaForSequenceClassification):
     def __init__(self, config, class_weights=None):
         super().__init__(config)
@@ -42,7 +42,7 @@ class WeightedRobertaForSequenceClassification(RobertaForSequenceClassification)
             attentions=outputs.attentions if hasattr(outputs, "attentions") else None,
         )
 
-# === Load and combine local CSVs ===
+
 def load_binary_dataset():
     file_label_pairs = [
         ("allsides_data/political_articles_left.csv", "Left"),
@@ -60,7 +60,7 @@ def load_binary_dataset():
     return pd.concat(dfs, ignore_index=True)[["content", "label"]].dropna()
 
 
-# === Metric function ===
+
 def compute_metrics(pred):
     labels = pred.label_ids
     preds = np.argmax(pred.predictions, axis=1)
@@ -143,7 +143,7 @@ def main():
 
     model.save_pretrained("./roberta_binary_model_full")
     tokenizer.save_pretrained("./roberta_binary_model_full")
-    print("✅ Model saved to ./roberta_binary_model_full")
+    print("Model saved to ./roberta_binary_model_full")
 
 if __name__ == "__main__":
     main()
