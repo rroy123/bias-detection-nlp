@@ -8,11 +8,11 @@ import numpy as np
 from transformers import TrainingArguments
 from sklearn.preprocessing import LabelEncoder
 
-# Check for GPU
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-# Load and label your data
+
 def load_dataset():
     file_label_pairs = [
         ("allsides_data/political_articles_left.csv", "Left"),
@@ -32,7 +32,6 @@ def load_dataset():
     return df_all[['content', 'label']]
 
 
-# Tokenization
 def tokenize_function(examples):
     tokens = tokenizer(
         examples["content"],
@@ -44,7 +43,7 @@ def tokenize_function(examples):
     return tokens
 
 
-# Compute metrics for evaluation
+
 def compute_metrics(pred):
     labels = pred.label_ids
     preds = np.argmax(pred.predictions, axis=1)
@@ -56,7 +55,7 @@ def compute_metrics(pred):
 if __name__ == "__main__":
     df = load_dataset()
     label_encoder = LabelEncoder()
-    df['label'] = label_encoder.fit_transform(df['label'])  # "Left", "Neutral", "Right" → 0, 1, 2
+    df['label'] = label_encoder.fit_transform(df['label'])
 
     train_texts, val_texts, train_labels, val_labels = train_test_split(
         df['content'].tolist(), df['label'].tolist(), test_size=0.2, random_state=42
@@ -98,15 +97,15 @@ if __name__ == "__main__":
 
     trainer.train()
 
-    # Final report
+    
     preds = trainer.predict(val_dataset)
     y_pred = np.argmax(preds.predictions, axis=1)
     print("\n=== Classification Report ===")
     print(classification_report(val_labels, y_pred, target_names=label_encoder.classes_))
 
-    # Save trained model and tokenizer
+    
     model.save_pretrained("./bert_bias_model")
     tokenizer.save_pretrained("./bert_bias_model")
-    print("✅ Model and tokenizer saved to ./bert_bias_model")
+    print("Model and tokenizer saved to ./bert_bias_model")
 
 

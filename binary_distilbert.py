@@ -7,12 +7,12 @@ from sklearn.metrics import accuracy_score, f1_score, classification_report
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 
-# Check device
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-# Load binary-labeled PARTIAL dataset (small for fast training)
-def load_partial_binary_dataset(sample_size_per_class=1500):
+
+def load_partial_binary_dataset(sample_size_per_class=None):
     file_label_pairs = [
         ("allsides_data/political_articles_left.csv", "Left"),
         ("allsides_data/political_articles_right.csv", "Right"),
@@ -24,13 +24,13 @@ def load_partial_binary_dataset(sample_size_per_class=1500):
         if "text" in df.columns:
             df = df.rename(columns={"text": "content"})
         df['label'] = label
-        df = df.sample(n=min(sample_size_per_class, len(df)), random_state=42)  # limit size
+        # df = df.sample(n=min(sample_size_per_class, len(df)), random_state=42) TEST
         dfs.append(df)
 
     df_all = pd.concat(dfs, ignore_index=True)
     return df_all[['content', 'label']]
 
-# Metric computation
+
 def compute_metrics(pred):
     labels = pred.label_ids
     preds = np.argmax(pred.predictions, axis=1)
@@ -40,7 +40,7 @@ def compute_metrics(pred):
     }
 
 if __name__ == "__main__":
-    df = load_partial_binary_dataset(sample_size_per_class=1500)  # ~3K articles total
+    df = load_partial_binary_dataset()  # Use 3k for test
     label_encoder = LabelEncoder()
     df['label'] = label_encoder.fit_transform(df['label'])  # Left: 0, Right: 1
 
@@ -85,13 +85,12 @@ if __name__ == "__main__":
 
     trainer.train()
 
-    # Final report
     preds = trainer.predict(val_dataset)
     y_pred = np.argmax(preds.predictions, axis=1)
     print("\n=== Binary Classification Report ===")
     print(classification_report(val_labels, y_pred, target_names=label_encoder.classes_))
 
-    # Save model and tokenizer
+    
     model.save_pretrained("./distilbert_binary_model")
     tokenizer.save_pretrained("./distilbert_binary_model")
-    print("\n\u2705 Binary classifier saved to ./distilbert_binary_model")
+    print("Binary classifier saved to ./distilbert_binary_model")

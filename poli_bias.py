@@ -1,4 +1,4 @@
-# poli_bias.py
+
 import numpy as np
 import pandas as pd
 import nltk
@@ -23,7 +23,7 @@ nltk.download('vader_lexicon')
 
 nlp = spacy.load("en_core_web_sm")
 
-# Initialize global NLP tools
+
 lemmatizer = WordNetLemmatizer()
 stop_words = set(stopwords.words('english'))
 sia = SentimentIntensityAnalyzer()
@@ -51,7 +51,7 @@ class BiasScorer:
         self.sia = SentimentIntensityAnalyzer()
 
     def bias_score(self, tokens):
-        """Scores how many left/right lexicon words appear in the token list."""
+        
         tokens_set = set(tokens)
         left_score = len(tokens_set & self.left_lexicon)
         right_score = len(tokens_set & self.right_lexicon)
@@ -75,26 +75,22 @@ class BiasScorer:
             return "Neutral"
 
 def preprocess(text):
-    """
-    Tokenize, lowercase, remove punctuation, remove stopwords, lemmatize
-    """
-    # Lowercase and remove non-alphabetic characters
+   
+   # simple clean
     text = text.lower()
     text = re.sub(r'[^a-z\s]', '', text)
 
-    # Tokenize
+   
     tokens = word_tokenize(text)
 
-    # Remove stopwords and lemmatize
+   
     cleaned = [lemmatizer.lemmatize(word) for word in tokens if word not in stop_words]
     return cleaned
 
 def analyze_sentiment(text):
-    """Return sentiment polarity scores from VADER."""
     return sia.polarity_scores(text)
 
 def load_and_preprocess(csv_path):
-    """Load CSV and preprocess content column."""
     df = pd.read_csv(csv_path, encoding='ISO-8859-1')
 
     df['named_entities'] = df['content'].apply(extract_named_entities)
@@ -103,14 +99,12 @@ def load_and_preprocess(csv_path):
     return df
 
 def compute_tfidf_vectors(df, column='content'):
-    """Compute TF-IDF vectors and return the matrix + feature names."""
-    vectorizer = TfidfVectorizer(stop_words='english', max_features=1000)  # tune max_features as needed
+    vectorizer = TfidfVectorizer(stop_words='english', max_features=1000) # change max feat
     tfidf_matrix = vectorizer.fit_transform(df[column])
     feature_names = vectorizer.get_feature_names_out()
     return tfidf_matrix, feature_names, vectorizer
 
 def top_tfidf_terms(tfidf_matrix, feature_names, doc_index, top_n=10):
-    """Return top N terms with highest TF-IDF scores for one document."""
     row = tfidf_matrix[doc_index].toarray().flatten()
     top_indices = row.argsort()[-top_n:][::-1]
     return [(feature_names[i], row[i]) for i in top_indices]
@@ -132,7 +126,7 @@ def load_and_preprocess_multiple(file_label_pairs):
 
 def plot_tfidf_pca(tfidf_matrix, labels):
     if tfidf_matrix.shape[0] < 2:
-        print("⚠️ Not enough articles to perform PCA. Add more samples first.")
+        print("Not enough articles to perform PCA. Add more samples first.")
         return
 
     pca = PCA(n_components=2)
@@ -156,7 +150,6 @@ def plot_tfidf_pca(tfidf_matrix, labels):
 
 
 def main():
-    # Load multiple labeled datasets
     file_label_pairs = [
         ("allsides_data/political_articles_left.csv", "Left"),
         ("allsides_data/political_articles_right.csv", "Right"),
@@ -176,23 +169,23 @@ def main():
     for term, score in top_terms:
         print(f"{term}: {score:.4f}")
 
-    # Lexicon-based scoring with tqdm progress bar
+    
     print("\n=== Scoring Lexicon Bias (This may take a minute) ===")
     tqdm.pandas(desc="Lexicon Scoring")
     scorer = BiasScorer(LEFT_LEXICON, RIGHT_LEXICON)
     df['bias_scores'] = df['tokens'].progress_apply(scorer.bias_score)
     df['bias_label'] = df['bias_scores'].apply(lambda x: scorer.label_bias(x['bias_score']))
 
-    # Save processed CSV
+    
     df.to_csv("processed_articles_with_features.csv", index=False)
-    print("✅ Processed CSV saved.")
+    print("Processed CSV saved.")
 
-    # PCA Visualization
+    
     print("\n=== Generating PCA Plot ===")
     plot_tfidf_pca(tfidf_matrix, df['bias'].tolist())
-    print("✅ PCA plot completed.")
+    print("PCA plot completed.")
 
-    # Evaluation
+    
     print("\n=== Evaluation: Lexicon-Based Bias vs Ground Truth ===")
     print(classification_report(df["bias"], df["bias_label"], digits=3))
 
@@ -204,7 +197,7 @@ def main():
     plt.title("Confusion Matrix: Lexicon Bias Classifier")
     plt.tight_layout()
     plt.savefig("confusion_matrix.png")
-    print("✅ Confusion matrix saved to confusion_matrix.png")
+    print("Confusion matrix saved to confusion_matrix.png")
 
 
 

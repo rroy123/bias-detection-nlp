@@ -7,12 +7,12 @@ from sklearn.metrics import accuracy_score, f1_score, classification_report
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 
-# Check for GPU
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-# Load and label your data (small subset for fast training)
-def load_dataset(sample_size=3000):
+
+def load_dataset(sample_size=3000): # Use sample bc this is 3 class
     file_label_pairs = [
         ("allsides_data/political_articles_left.csv", "Left"),
         ("allsides_data/political_articles_right.csv", "Right"),
@@ -31,7 +31,7 @@ def load_dataset(sample_size=3000):
     df_all = df_all[['content', 'label']].dropna().sample(n=sample_size, random_state=42)
     return df_all
 
-# Compute metrics
+
 def compute_metrics(pred):
     labels = pred.label_ids
     preds = np.argmax(pred.predictions, axis=1)
@@ -92,7 +92,7 @@ if __name__ == "__main__":
     print("\n=== Classification Report ===")
     print(classification_report(val_labels, y_pred, target_names=label_encoder.classes_))
 
-    # ✅ Save model and tokenizer
+
     model.save_pretrained("./distilbert_bias_model")
     tokenizer.save_pretrained("./distilbert_bias_model")
-    print("✅ Model and tokenizer saved to ./distilbert_bias_model")
+    print("Model and tokenizer saved to ./distilbert_bias_model")
